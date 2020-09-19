@@ -7,18 +7,35 @@ function love.load ()
 	left = 0;  right = 1;  up = 2;  down = 3
 	upleft = 4; downleft = 5; upright = 6; downright = 7
 
-	aBatFly = animx.newAnimation{
-		img = "art/sprites/bat.png",
-		sprites_per_row = 5,
-		noOfFrames = 5
-	}:loop()
+	batSheet = love.graphics.newImage("art/sprites/bat.png")
+
+	batFlapAnim = animx.newAnimation{
+		img = batSheet,
+		tileWidth = 32,
+		frames = { 2, 3, 4, 5 }
+	}:onAnimOver( function()
+		bat.actor:switch('idle')
+	end )
+
+	batIdleAnim = animx.newAnimation {
+		img = batSheet,
+		tileWidth = 32,
+		frames = { 1 }
+	}
+
+	batActor = animx.newActor {
+		['idle'] = batIdleAnim,
+		['flap'] = batFlapAnim
+	}:switch('idle')
+
+--	batActor:switch('idle')
 
 	bat = { x = 50, y = 200,
 		y_vel = 0, x_vel = 0,
 		moving = false,
 		flying = false,
 		direction = left,
-		animation = aBatFly
+		actor = batActor
 	}
 
 	-- for compliance with Statute 43.5 (2019); all birds must report births to local Officials
@@ -51,13 +68,13 @@ function love.keypressed ( key )
 	if ( key == "right" ) then
 		bat.moving = true
 		bat.direction = right
-		aBatFly:flipX(true)
 	elseif ( key == "left" ) then
 		bat.moving = true
 		bat.direction = left
-		aBatFly:flipX(false)
 	elseif ( key == "space" ) then
 		bat.flying = true
+		bat.actor:switch('flap')
+		bat.actor:getAnimation():restart()
 	end
 end
 
@@ -87,7 +104,12 @@ function flier_update ( flier, dt )
 end
 
 function flier_draw ( flier )
-	flier.animation:draw( flier.x, flier.y )
+	if ( flier.direction == right ) then
+		flier.actor:flipX(true)
+	elseif (flier.direction == left) then
+		flier.actor:flipX(false)
+	end
+	flier.actor:draw( flier.x, flier.y )
 end
 
 ----------------------------------------
@@ -104,18 +126,20 @@ end
 function flier_physics_x ( flier, dt )
 	max_vel = 300
 	min_vel = -300
+	floor = 500
+	turn = 300
 
 	if ( flier.moving ) then
 	 	if ( flier.x_vel < max_vel and flier.direction == right ) then
-			flier.x_vel = flier.x_vel + (max_vel / 300)
+			flier.x_vel = flier.x_vel + (max_vel / turn)
 	 	elseif ( flier.x_vel > min_vel and flier.direction == left ) then
-			flier.x_vel = flier.x_vel - (max_vel / 300)
+			flier.x_vel = flier.x_vel - (max_vel / turn)
 		end
 	else
 		if ( flier.x_vel > 0 ) then
-			flier.x_vel = flier.x_vel - (max_vel / 600)
+			flier.x_vel = flier.x_vel - (max_vel / (turn * 3))
 		elseif ( flier.x_vel < 0 ) then
-			flier.x_vel = flier.x_vel + (max_vel / 600)
+			flier.x_vel = flier.x_vel + (max_vel / (turn * 3))
 		end
 	end
 
