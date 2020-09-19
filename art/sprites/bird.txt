@@ -1,0 +1,3 @@
+Author: 	MoikMellah
+Source: 	https://opengameart.org/content/animated-birds-32x32
+License:	CC0

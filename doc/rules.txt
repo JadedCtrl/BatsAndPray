@@ -1,0 +1,28 @@
+RULES: Joust-style
+----------------------------------------
+
+If a flier lands ON TOP of another, the lower flier is KILLED.
+If fliers run into each other HEAD-ON, they BOUNCE away from each other.
+
+A flier can DASH to KILL another from ANY direction, but if they miss, they become DAZED.
+
+A flier can SWIPE to KILL another flier HEAD-ON.
+
+A flier can BLOCK both SWIPES and DASHES, and the attacker becomes DAZED.
+
+A DAZED flier cannot BLOCK NOR DASH, and can be KILLED from ANY direction
+
+Block has a cooldown; dashing's cooldown is daze; swipe has virtually no cooldown.
+
+
+CONTROLS: Joust-ish
+----------------------------------------
+(LEFT)	point/walk left
+(RIGHT)	point/walk right
+(UP)	point up
+(DOWN)	point down
+
+(A)	flap wings
+(B)	dash where pointed
+(C)	block where pointed
+(D)	swipe
