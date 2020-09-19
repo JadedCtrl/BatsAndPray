@@ -1,5 +1,6 @@
-animx = require "lib/animx"
-class = require "lib/middleclass"
+animx  = require "lib/animx"
+class  = require "lib/middleclass"
+
 
 ----------------------------------------
 -- LOAD
@@ -8,30 +9,44 @@ function love.load ()
 	left = 0;  right = 1;  up = 2;  down = 3
 	upleft = 4; downleft = 5; upright = 6; downright = 7
 
-	player = Bat:new( )
---
+	bg = love.graphics.newImage("art/bg/sky.png")
+
+	player = Bat:new()
+	birdo = Bird:new( 10, 100  )
+	birdtwo = Bird:new( 600, 10 )
+	birdthree = Bird:new( 500, 200)
+
 	-- for compliance with Statute 43.5 (2019); all birds must report births to local Officials
 	birdRegistry = {}
 end
+
 
 ----------------------------------------
 -- UPDATE
 ----------------------------------------
 function love.update ( dt )
---	player.x = player.x + 100 * dt
-	
 	player:update( dt )
+	birdo:update( dt )
+	birdtwo:update( dt )
+	birdthree:update( dt )
 	animx.update(dt)
 end
+
 
 ----------------------------------------
 -- DRAW
 ----------------------------------------
 function love.draw ()
-	love.graphics.print('Hello World!', 400, 300)
+	love.graphics.draw(bg, 0, 0)
+	love.graphics.draw(bg, 512, 0)
 	player:draw()
+	birdo:draw()
+	birdtwo:draw()
+	birdthree:draw()
 end
 
+function love.resize ( width, height )
+end
 
 ----------------------------------------
 -- INPUT
@@ -44,9 +59,7 @@ function love.keypressed ( key )
 		player.moving = true
 		player.direction = left
 	elseif ( key == "space" ) then
-		player.flying = true
-		player.actor:switch('flap')
-		player.actor:getAnimation():restart()
+		player.flying = 2
 	end
 end
 
@@ -68,10 +81,9 @@ end
 
 
 ----------------------------------------
--- FLIERS
+-- FLIER	entity superclass
 ----------------------------------------
 -- birds and bats both fly. fliers.
-
 Flier = class('Flier')
 
 function Flier:initialize ( x, y, actor )
@@ -80,16 +92,22 @@ function Flier:initialize ( x, y, actor )
 	self.y_vel = 0
 	self.x_vel = 0
 	self.moving = false
-	self.flying = false
+	self.flying = 0
 	self.actor = actor
 end
 
--- generic flier update: physics + changing position
+-- generic flier update: physics
 function Flier:update ( dt )
 	self:physics( dt )
 end
 
+-- drawing the flier (ofc)
 function Flier:draw ( )
+	if ( self.flying > 0 ) then
+		self.actor:switch('flap')
+		self.actor:getAnimation():restart()
+		self.flying = self.flying - 1
+	end
 	if ( self.direction == right ) then
 		self.actor:flipX(true)
 	elseif (self.direction == left) then
@@ -98,21 +116,19 @@ function Flier:draw ( )
 	self.actor:draw( self.x, self.y )
 end
 
-----------------------------------------
--- "PHYSICS"
-----------------------------------------
--- "physics" being used verryyyyy lightly here
-
--- does basics physics work (determines velocity) for a flier
+--------------------
+-- "physics"
+--------------------
 function Flier:physics ( dt )
 	self:physics_x( dt )
 	self:physics_y( dt )
 end
 
+-- physics on the x-axis
 function Flier:physics_x ( dt )
 	max_vel = 300
 	min_vel = -300
-	turn = 300
+	turn = 150
 
 	-- holding arrow-key
 	if ( self.moving ) then
@@ -132,14 +148,15 @@ function Flier:physics_x ( dt )
 	self.x = self.x + self.x_vel * dt
 end
 
+-- physics on the y-axis
 function Flier:physics_y ( dt )
-	gravity = .85
+	gravity = 2
 	floor = 500
 
 	-- wing-flap
-	if ( self.flying ) then
-		self.y_vel = -175
-		self.flying = false
+	if ( self.flying > 0 ) then
+		self.y_vel = -200
+		self.flying = self.flying - 1
 	end
 
 	-- gravity 
@@ -156,9 +173,14 @@ function Flier:physics_y ( dt )
 	self.y = self.y + self.y_vel * dt
 end
 
+
+----------------------------------------
+-- BAT  	player characters
+----------------------------------------
 Bat = class('Bat', Flier)
 
-function Bat:initialize()
+function Bat:initialize ()
+	-- animations
 	batSheet = love.graphics.newImage("art/sprites/bat.png")
 
 	batFlapAnim = animx.newAnimation{
@@ -181,4 +203,65 @@ function Bat:initialize()
 	}:switch('idle')
 
 	Flier.initialize( self, 50, 100, batActor )
+end
+
+
+----------------------------------------
+-- BIRD  	enemy characters
+----------------------------------------
+Bird = class('Bird', Flier)
+
+function Bird:initialize ( x, y )
+	-- animations
+	birdSheet = love.graphics.newImage("art/sprites/bat.png")
+
+	birdFlapAnim = animx.newAnimation{
+		img = birdSheet,
+		tileWidth = 32,
+		frames = { 2, 3, 4, 5 }
+	}:onAnimOver( function()
+		player.actor:switch('idle')
+	end )
+
+	birdIdleAnim = animx.newAnimation {
+		img = birdSheet,
+		tileWidth = 32,
+		frames = { 1 }
+	}
+
+	birdActor = animx.newActor {
+		['idle'] = birdIdleAnim,
+		['flap'] = birdFlapAnim
+	}:switch('idle')
+
+	Flier.initialize( self, x, y, birdActor )
+	self.direction=right
+end
+
+function Bird:update ( dt )
+	self:destiny()
+	self:physics( dt )
+end
+
+-- basic "ai" (determines where the bird should go)
+function Bird:destiny ()
+	self:destiny_x()
+	self:destiny_y()
+end
+
+-- "ai" on x-axis
+function Bird:destiny_x ()
+	if ( self.x > 500 ) then
+		self.direction = left
+	elseif (self.x < 200) then
+		self.direction = right
+	end
+	self.moving = true
+end
+
+-- "ai" on y-axis
+function Bird:destiny_y ()
+	if ( self.y > player.y  and  math.random(0,50) == 25 ) then
+		self.flying = 2
+	end
 end
