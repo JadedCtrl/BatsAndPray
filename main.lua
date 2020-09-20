@@ -8,8 +8,9 @@ left = 0;  right = 1;  up = 2;  down = 3
 upleft = 4; downleft = 5; upright = 6; downright = 7
 menu = 0; game = 1; gameover = 2
 
-
-----------------------------------------
+--------------------------------------------------------------------------------
+-- GAME STATES
+--------------------------------------------------------------------------------
 -- LOVE
 ----------------------------------------
 -- LOAD
@@ -269,7 +270,10 @@ function game_keyreleased (key)
 end
 
 
-----------------------------------------
+
+--------------------------------------------------------------------------------
+-- ENTITY CLASSES
+--------------------------------------------------------------------------------
 -- FLIER	entity superclass
 ----------------------------------------
 -- birds and bats both fly. fliers.
@@ -321,9 +325,14 @@ end
 
 -- physics on the x-axis
 function Flier:physics_x ( dt )
-	max_vel = 300
-	min_vel = -300
 	turn = 150
+	if ( self.species ) then -- if bird
+		max_vel = 280
+		min_vel = -280
+	else	
+		max_vel = 300
+		min_vel = -300
+	end
 
 	-- holding arrow-key
 	if ( self.moving ) then
@@ -374,17 +383,29 @@ function Flier:physics_y ( dt )
 	self.y = self.y + self.y_vel * dt
 end
 
+-- if not living; in death-spiral
 function Flier:physics_dead ( dt )
 	-- ignore all input, fall through bottom
 	gravity = 2
 	self.y_vel = self.y_vel + gravity
 	self.y = self.y + self.y_vel * dt
-	if ( self.y > 610 ) then
+	if ( self.y > 700 ) then
 		self:killFinalize()
 		return false
 	else
 		return true
 	end
+end
+
+-- kill the Flier, show cool particles
+function Flier:kill ()
+	self.living = false
+	psystem:moveTo(self.x, self.y)
+	psystem:emit(30)
+end
+
+-- run after Flier falls through screen
+function Flier:killFinalize ()
 end
 
 
@@ -397,28 +418,31 @@ Bat = class('Bat', Flier)
 function Bat:initialize ()
 	-- animations
 	batSheet = love.graphics.newImage("art/sprites/bat.png")
+	flapFrames = {2,3,4,5}
+	idleFrames = {1}
 
 	batFlapAnim = animx.newAnimation{
-		img = batSheet,
-		tileWidth = 32,
-		frames = { 2, 3, 4, 5 }
+		img = batSheet, tileWidth = 32, frames = flapFrames
 	}:onAnimOver( function()
-		player.actor:switch('idle')
+		self.actor:switch('idle')
 	end )
 
 	batIdleAnim = animx.newAnimation {
-		img = batSheet,
-		tileWidth = 32,
-		frames = { 1 }
+		img = batSheet, tileWidth = 32, frames = idleFrames
 	}
 
 	batActor = animx.newActor {
-		['idle'] = batIdleAnim,
-		['flap'] = batFlapAnim
+		['idle'] = batIdleAnim, ['flap'] = batFlapAnim
 	}:switch('idle')
 
 	Flier.initialize( self, 50, 100, batActor )
 end
+
+function Bat:update ( dt )
+	self:physics( dt )
+	self:checkBirdCollisions()
+end
+
 
 -- return whether or not the Bat's colliding with given object
 function Bat:checkCollision ( other )
@@ -440,16 +464,11 @@ function Bat:checkBirdCollisions ()
 	return nil
 end
 
-function Bat:update ( dt )
-	self:physics( dt )
-	self:checkBirdCollisions()
-end
 
 -- called after dead Bat falls through screen
 function Bat:killFinalize()
 	lives = lives - 1
 	lifeText:set("Life " .. lives)
-
 
 	if ( lives <= 0 ) then
 		gameover_load()
@@ -460,11 +479,7 @@ function Bat:killFinalize()
 	end
 end
 
-function Bat:kill ()
-	self.living = false
-	psystem:moveTo(self.x, self.y)
-	psystem:emit(30)
-end
+
 
 ----------------------------------------
 -- BIRD  	enemy characters
@@ -472,44 +487,35 @@ end
 Bird = class('Bird', Flier)
 
 function Bird:initialize ( x, y )
+	self.species = math.random(1,3)
+
 	-- animations
-
-	self.species = math.random(2,3)
-
-	if ( self.species == 3 ) then
-		flapFrames = { 2, 3, 4, 5 }
-		idleFrames = { 1 }
-	elseif ( self.species == 2  or  self.species == 3 ) then
-		flapFrames = { 7, 8, 9, 10 }
-		idleFrames = { 6 }
-	end
-	if ( self.species == 3 ) then
-		self.direction = math.random(left, right)
-	else
-		self.direction = right
-	end
-
 	birdSheet = love.graphics.newImage("art/sprites/bird.png")
+	flapFrames = { {2,3,4,5}, {7,8,9,10}, {7,8,9,10} }
+	idleFrames = { {1}, {6}, {6} }
+
 	birdFlapAnim = animx.newAnimation{
-		img = birdSheet,
-		tileWidth = 32,
-		tileHeight = 32,
-		frames = flapFrames
+		img = birdSheet, tileWidth = 32, tileHeight = 32, frames = flapFrames[self.species]
 	}:onAnimOver( function()
 		self.actor:switch('idle')
 	end )
 
 	birdIdleAnim = animx.newAnimation {
-		img = birdSheet,
-		tileWidth = 32,
-		tileHeight = 32,
-		frames = idleFrames
+		img = birdSheet, tileWidth = 32, tileHeight = 32, frames = idleFrames[self.species]
 	}
 
 	birdActor = animx.newActor {
-		['idle'] = birdIdleAnim,
-		['flap'] = birdFlapAnim
+		['idle'] = birdIdleAnim, ['flap'] = birdFlapAnim
 	}:switch('idle')
+
+	self.actor = birdActor
+
+
+	if ( self.species == 3 ) then
+		self.direction = math.random(left, right)
+	else
+		self.direction = right
+	end
 
 	Flier.initialize( self, x, y, birdActor )
 end
@@ -519,17 +525,6 @@ function Bird:update ( dt )
 	return self:physics( dt )
 end
 
-function Bird:killFinalize()
-	index = indexOf(birdRegistry, self)
-	table.remove( birdRegistry, index )
-end
-	
-function Bird:kill ()
-	self.living = false
-	psystem:moveTo(self.x, self.y)
-	psystem:emit(30)
-end
-	
 
 -- basic "ai" (determines where the bird should go)
 function Bird:destiny ()
@@ -566,9 +561,18 @@ function Bird:destiny_y ()
 end
 
 
-----------------------------------------
--- GAME LOGIC
-----------------------------------------
+-- after dead bird falls through screen
+function Bird:killFinalize()
+	index = indexOf(birdRegistry, self)
+	table.remove( birdRegistry, index )
+end
+
+
+
+--------------------------------------------------------------------------------
+-- MISC GAME LOGIC
+--------------------------------------------------------------------------------
+-- set up a new wave of birds
 function nextWave ( )
 	wave = wave + 1
 	waveText:set("Wave " .. wave)
@@ -599,13 +603,12 @@ function judgeCollision ( a, b )
 		b.x_vel = b.x_vel * -1
 	end
 end
-	
-	
 
 
-----------------------------------------
+
+--------------------------------------------------------------------------------
 -- UTIL  	blah blah blah
-----------------------------------------
+--------------------------------------------------------------------------------
 -- return whether or not two objects are colliding/overlapping
 function colliding ( a, b )
 	if ( inRange(a.x, b.x - 16, b.x + 16)  and  inRange(a.y, b.y - 16, b.y + 16) ) then
@@ -634,6 +637,7 @@ function greatestAbs ( a, b )
 	end
 end
 
+-- return index of given item in list
 function indexOf ( list, item )
 	for i = 1,table.maxn(list) do
 		if ( list[i] == item ) then
