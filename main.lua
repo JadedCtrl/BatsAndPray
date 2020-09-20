@@ -19,14 +19,14 @@ function love.load ()
 	vScale = 0
 	maxScore = 0
 
+	psystem = nil
 	love.graphics.setDefaultFilter("nearest", "nearest", 0)
-
 	bg = love.graphics.newImage("art/bg/sky.png")
 	a_ttf = love.graphics.newFont("art/font/alagard.ttf")
+
 	lifeText = love.graphics.newText(a_ttf, "Press Enter")
 	waveText = love.graphics.newText(a_ttf, "")
 	bigText  = love.graphics.newText(a_ttf, "Bats & Pray")
-
 
 	-- for compliance with Statute 43.5 (2019); all birds must report births to local Officials
 	birdRegistry = {}
@@ -102,6 +102,8 @@ end
 -- LOAD
 --------------------
 function menu_load ()
+	mode = menu
+	psystem = nil
 	waveText:set("[Enter]")
 	lifeText:set("")
 	bigText:set("Bats & Pray")
@@ -139,6 +141,7 @@ end
 --------------------
 function gameover_load ()
 	mode = gameover
+	psystem = nil
 	lifeText:set("High Score")
 	waveText:set("  " .. maxScore)
 	bigText:set("Game Over")
@@ -154,6 +157,7 @@ end
 -- DRAW
 --------------------
 function gameover_draw ()
+	game_draw()
 end
 
 --------------------
@@ -184,6 +188,16 @@ function game_load ()
 
 	player = Bat:new()
 	birdRegistry = {}
+
+	-- death particles
+	ded = love.graphics.newImage("art/sprites/particle.png")
+	psystem = love.graphics.newParticleSystem(ded, 30)
+	psystem:setParticleLifetime(1) -- Particles live at least 2s and at most 5s.
+	psystem:setSizeVariation(1)
+	psystem:setEmissionRate(0)
+	psystem:setLinearAcceleration(-200, -200, 200, 200) -- Random movement in all directions.
+	psystem:setSpeed(40, 50)
+	psystem:setColors(1, 1, 1, 1, 1, 1, 1, 0) 
 end
 
 --------------------
@@ -191,13 +205,16 @@ end
 --------------------
 function game_update ( dt )
 	bird_n = table.maxn( birdRegistry )
+	psystem:update ( dt )
 
 	if ( bird_n == 0 ) then
 		nextWave()
 	end
 
 	for i = 1,bird_n do
-		birdRegistry[i]:update( dt )
+		if ( false == birdRegistry[i]:update( dt ) ) then
+			break
+		end
 	end
 
 	player:update( dt )
@@ -212,6 +229,10 @@ function game_draw ()
 		birdRegistry[i]:draw()
 	end
 	player:draw()
+
+	if ( psystem ) then
+		love.graphics.draw(psystem)
+	end
 end
 
 --------------------
@@ -247,14 +268,6 @@ function game_keyreleased (key)
 	end
 end
 
-----------------------------------------
--- DRAW
-----------------------------------------
-
-
-
-
-
 
 ----------------------------------------
 -- FLIER	entity superclass
@@ -270,6 +283,7 @@ function Flier:initialize ( x, y, actor )
 	self.moving = false
 	self.flying = 0
 	self.actor = actor
+	self.living = true
 end
 
 -- generic flier update: physics
@@ -296,8 +310,13 @@ end
 -- "physics"
 --------------------
 function Flier:physics ( dt )
-	self:physics_x( dt )
-	self:physics_y( dt )
+	if ( self.living ) then
+		self:physics_x( dt )
+		self:physics_y( dt )
+		return true
+	else
+		return self:physics_dead( dt )
+	end
 end
 
 -- physics on the x-axis
@@ -346,7 +365,7 @@ function Flier:physics_y ( dt )
 		self.y_vel = self.y_vel + gravity
 	end
 
-	-- if on ground; stop gravity
+	-- if on ground; flap your wings
 	if ( self.y > floor ) then
 		self.y = floor
 		self.flying = 2
@@ -355,6 +374,18 @@ function Flier:physics_y ( dt )
 	self.y = self.y + self.y_vel * dt
 end
 
+function Flier:physics_dead ( dt )
+	-- ignore all input, fall through bottom
+	gravity = 2
+	self.y_vel = self.y_vel + gravity
+	self.y = self.y + self.y_vel * dt
+	if ( self.y > 610 ) then
+		self:killFinalize()
+		return false
+	else
+		return true
+	end
+end
 
 
 
@@ -392,7 +423,6 @@ end
 -- return whether or not the Bat's colliding with given object
 function Bat:checkCollision ( other )
 	if ( colliding( self, other ) )  then
---		print("COLLISION AT " .. self.x .. " " .. other.x )
 		return true
 	else
 		return false
@@ -415,15 +445,25 @@ function Bat:update ( dt )
 	self:checkBirdCollisions()
 end
 
-function Bat:kill ()
+-- called after dead Bat falls through screen
+function Bat:killFinalize()
 	lives = lives - 1
 	lifeText:set("Life " .. lives)
-	self.y = -10
-	self.x = 300
+
 
 	if ( lives <= 0 ) then
 		gameover_load()
+	else
+		self.y = -5
+		self.x = 300
+		self.living = true
 	end
+end
+
+function Bat:kill ()
+	self.living = false
+	psystem:moveTo(self.x, self.y)
+	psystem:emit(30)
 end
 
 ----------------------------------------
@@ -434,18 +474,19 @@ Bird = class('Bird', Flier)
 function Bird:initialize ( x, y )
 	-- animations
 
-	species = math.random(1,2)
+	self.species = math.random(2,3)
 
-	if ( species == 1 ) then
+	if ( self.species == 3 ) then
 		flapFrames = { 2, 3, 4, 5 }
-	else
-		flapFrames = { 7, 8, 9, 10 }
-	end
-
-	if ( species == 1 ) then
 		idleFrames = { 1 }
-	else
+	elseif ( self.species == 2  or  self.species == 3 ) then
+		flapFrames = { 7, 8, 9, 10 }
 		idleFrames = { 6 }
+	end
+	if ( self.species == 3 ) then
+		self.direction = math.random(left, right)
+	else
+		self.direction = right
 	end
 
 	birdSheet = love.graphics.newImage("art/sprites/bird.png")
@@ -471,18 +512,22 @@ function Bird:initialize ( x, y )
 	}:switch('idle')
 
 	Flier.initialize( self, x, y, birdActor )
-
-	self.direction=right
 end
 
 function Bird:update ( dt )
 	self:destiny()
-	self:physics( dt )
+	return self:physics( dt )
 end
 
-function Bird:kill ()
+function Bird:killFinalize()
 	index = indexOf(birdRegistry, self)
 	table.remove( birdRegistry, index )
+end
+	
+function Bird:kill ()
+	self.living = false
+	psystem:moveTo(self.x, self.y)
+	psystem:emit(30)
 end
 	
 
@@ -494,19 +539,22 @@ end
 
 -- "ai" on x-axis of species 1
 function Bird:destiny_x ()
-	if ( species == 1 ) then
-		if ( self.x > 400 ) then
+	if ( self.species == 1 ) then
+		-- fly around the screen, left to right, right to left
+		if ( self.x > 450 ) then
 			self.direction = left
-		elseif ( self.x < 200 ) then
+		elseif ( self.x < 250 ) then
 			self.direction = right
 		end
-	else
+	elseif ( self.species == 2 ) then
+		-- follow the player bat
 		if ( self.x > player.x + 25  and  math.random(0,50) == 25 ) then
 			self.direction = left
 		elseif ( self.x < player.x - 25  and  math.random(0,50) == 25 ) then
 			self.direction = right
 		end
 	end
+		
 	self.moving = true
 end
 
@@ -542,12 +590,11 @@ end
 -- assuming a and b are colliding, act accordingly
 -- aka, bounce-back or kill one
 function judgeCollision ( a, b )
-	if ( a.y < b.y - 5 ) then
+	if ( a.y < b.y - 5  and  a.living ) then
 		b:kill()
-	elseif ( a.y > b.y + 5 ) then
+	elseif ( a.y > b.y + 5  and  b.living ) then
 		a:kill()
 	else
---		new_vel = greatestAbs( a.x_vel, b.x_vel )
 		a.x_vel = a.x_vel * -1
 		b.x_vel = b.x_vel * -1
 	end
