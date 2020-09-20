@@ -19,8 +19,9 @@ function love.load ()
 	mode = menu
 	vScale = 0
 	maxScore = 0
+	math.randomseed(os.time())
 
-	psystem = nil
+	dieParticle = nil
 	love.graphics.setDefaultFilter("nearest", "nearest", 0)
 	bg = love.graphics.newImage("art/bg/sky.png")
 	a_ttf = love.graphics.newFont("art/font/alagard.ttf")
@@ -56,9 +57,9 @@ function love.draw ()
 	love.graphics.draw(bg, 0, 0)
 	love.graphics.draw(bg, 512, 0)
 
-	love.graphics.draw(waveText, 200, 220, 0, 2, 2)
-	love.graphics.draw(lifeText, 125, 225, 0, 1.3, 1.3)
-	love.graphics.draw(bigText, 300, 200, 0, 3.5, 3.5)
+	love.graphics.draw(waveText, 200, 340, 0, 2, 2)
+	love.graphics.draw(lifeText, 125, 355, 0, 1.3, 1.3)
+	love.graphics.draw(bigText, 300, 300, 0, 3.5, 3.5)
 
 	if ( mode == menu ) then
 		menu_draw()
@@ -104,7 +105,7 @@ end
 --------------------
 function menu_load ()
 	mode = menu
-	psystem = nil
+	dieParticle = nil
 	waveText:set("[Enter]")
 	lifeText:set("")
 	bigText:set("Bats & Pray")
@@ -142,9 +143,8 @@ end
 --------------------
 function gameover_load ()
 	mode = gameover
-	psystem = nil
-	lifeText:set("High Score")
-	waveText:set("  " .. maxScore)
+	dieParticle = nil
+	lifeText:set("Best " .. maxScore)
 	bigText:set("Game Over")
 end
 
@@ -191,14 +191,14 @@ function game_load ()
 	birdRegistry = {}
 
 	-- death particles
-	ded = love.graphics.newImage("art/sprites/particle.png")
-	psystem = love.graphics.newParticleSystem(ded, 30)
-	psystem:setParticleLifetime(1) -- Particles live at least 2s and at most 5s.
-	psystem:setSizeVariation(1)
-	psystem:setEmissionRate(0)
-	psystem:setLinearAcceleration(-200, -200, 200, 200) -- Random movement in all directions.
-	psystem:setSpeed(40, 50)
-	psystem:setColors(1, 1, 1, 1, 1, 1, 1, 0) 
+	diePArt = love.graphics.newImage("art/sprites/particle.png")
+	dieParticle = love.graphics.newParticleSystem(diePArt, 30)
+	dieParticle:setParticleLifetime(.5) -- Particles live at least 2s and at most 5s.
+	dieParticle:setSizeVariation(1)
+	dieParticle:setEmissionRate(0)
+	dieParticle:setLinearAcceleration(-200, -200, 200, 200) -- Random movement in all directions.
+	dieParticle:setSpeed(40, 50)
+	dieParticle:setColors(1, 1, 1, 1, 1, 1, 1, 0) 
 end
 
 --------------------
@@ -206,7 +206,7 @@ end
 --------------------
 function game_update ( dt )
 	bird_n = table.maxn( birdRegistry )
-	psystem:update ( dt )
+	dieParticle:update ( dt )
 
 	if ( bird_n == 0 ) then
 		nextWave()
@@ -231,8 +231,8 @@ function game_draw ()
 	end
 	player:draw()
 
-	if ( psystem ) then
-		love.graphics.draw(psystem)
+	if ( dieParticle ) then
+		love.graphics.draw(dieParticle)
 	end
 end
 
@@ -400,8 +400,8 @@ end
 -- kill the Flier, show cool particles
 function Flier:kill ()
 	self.living = false
-	psystem:moveTo(self.x, self.y)
-	psystem:emit(30)
+	dieParticle:moveTo(self.x, self.y)
+	dieParticle:emit(30)
 end
 
 -- run after Flier falls through screen
@@ -491,8 +491,8 @@ function Bird:initialize ( x, y )
 
 	-- animations
 	birdSheet = love.graphics.newImage("art/sprites/bird.png")
-	flapFrames = { {2,3,4,5}, {7,8,9,10}, {7,8,9,10} }
-	idleFrames = { {1}, {6}, {6} }
+	flapFrames = { {2,3,4,5}, {7,8,9,10}, {12,13,14,15} }
+	idleFrames = { {1}, {6}, {11} }
 
 	birdFlapAnim = animx.newAnimation{
 		img = birdSheet, tileWidth = 32, tileHeight = 32, frames = flapFrames[self.species]
