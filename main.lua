@@ -1,57 +1,223 @@
 animx  = require "lib/animx"
 class  = require "lib/middleclass"
 
+----------------------------------------
+-- CONSTANTS
+----------------------------------------
+left = 0;  right = 1;  up = 2;  down = 3
+upleft = 4; downleft = 5; upright = 6; downright = 7
+menu = 0; game = 1; gameover = 2
 
+
+----------------------------------------
+-- LOVE
 ----------------------------------------
 -- LOAD
-----------------------------------------
+--------------------
 function love.load ()
-	left = 0;  right = 1;  up = 2;  down = 3
-	upleft = 4; downleft = 5; upright = 6; downright = 7
+	mode = menu
+	vScale = 0
+	maxScore = 0
+
+	love.graphics.setDefaultFilter("nearest", "nearest", 0)
 
 	bg = love.graphics.newImage("art/bg/sky.png")
+	a_ttf = love.graphics.newFont("art/font/alagard.ttf")
+	lifeText = love.graphics.newText(a_ttf, "Press Enter")
+	waveText = love.graphics.newText(a_ttf, "")
+	bigText  = love.graphics.newText(a_ttf, "Bats & Pray")
 
-	player = Bat:new()
-	birdo = Bird:new( 10, 100  )
-	birdtwo = Bird:new( 600, 10 )
-	birdthree = Bird:new( 500, 200)
 
 	-- for compliance with Statute 43.5 (2019); all birds must report births to local Officials
 	birdRegistry = {}
 end
 
-
-----------------------------------------
+--------------------
 -- UPDATE
-----------------------------------------
+--------------------
 function love.update ( dt )
-	player:update( dt )
-	birdo:update( dt )
-	birdtwo:update( dt )
-	birdthree:update( dt )
-	animx.update(dt)
+	if ( mode == menu ) then
+		menu_update( dt )
+	elseif ( mode == game ) then
+		game_update( dt )
+	elseif ( mode == gameover ) then
+		gameover_update( dt )
+	end
 end
 
-
-----------------------------------------
--- DRAW
-----------------------------------------
+--------------------
+-- DRAW 
+--------------------
 function love.draw ()
+	if ( vScale > 0 ) then
+		love.graphics.scale( vScale, vScale )
+	end
 	love.graphics.draw(bg, 0, 0)
 	love.graphics.draw(bg, 512, 0)
-	player:draw()
-	birdo:draw()
-	birdtwo:draw()
-	birdthree:draw()
+
+	love.graphics.draw(waveText, 200, 220, 0, 2, 2)
+	love.graphics.draw(lifeText, 125, 225, 0, 1.3, 1.3)
+	love.graphics.draw(bigText, 300, 200, 0, 3.5, 3.5)
+
+	if ( mode == menu ) then
+		menu_draw()
+	elseif ( mode == game ) then
+		game_draw()
+	elseif ( mode == gameover ) then
+		gameover_draw()
+	end
 end
 
 function love.resize ( width, height )
+	vScale = height / 600
 end
 
 ----------------------------------------
 -- INPUT
 ----------------------------------------
 function love.keypressed ( key )
+	if ( mode == menu ) then
+		menu_keypressed( key )
+	elseif ( mode == game ) then
+		game_keypressed( key )
+	elseif ( mode == gameover ) then
+		gameover_keypressed( key )
+	end
+end
+
+function love.keyreleased (key)
+	if ( mode == menu ) then
+		menu_keyreleased( key )
+	elseif ( mode == game ) then
+		game_keyreleased( key )
+	elseif ( mode == gameover ) then
+		gameover_keyreleased( key )
+	end
+end
+
+
+----------------------------------------
+-- MENU
+----------------------------------------
+-- LOAD
+--------------------
+function menu_load ()
+	waveText:set("[Enter]")
+	lifeText:set("")
+	bigText:set("Bats & Pray")
+end
+
+--------------------
+-- UPDATE
+--------------------
+function menu_update ( dt )
+end
+
+--------------------
+-- DRAW
+--------------------
+function menu_draw ()
+end
+
+--------------------
+-- INPUT
+--------------------
+function menu_keypressed ( key )
+--	if ( key == "enter" ) then
+		game_load()
+--	end
+end
+
+function menu_keyreleased ( key )
+end
+
+
+----------------------------------------
+-- GAMEOVER
+----------------------------------------
+-- LOAD
+--------------------
+function gameover_load ()
+	mode = gameover
+	lifeText:set("High Score")
+	waveText:set("  " .. maxScore)
+	bigText:set("Game Over")
+end
+
+--------------------
+-- UPDATE
+--------------------
+function gameover_update ( dt )
+end
+
+--------------------
+-- DRAW
+--------------------
+function gameover_draw ()
+end
+
+--------------------
+-- INPUT
+--------------------
+function gameover_keypressed ( key )
+--	if ( key == "enter" ) then
+		game_load()
+--	end
+end
+
+function gameover_keyreleased ( key )
+end
+
+
+----------------------------------------
+-- GAME
+----------------------------------------
+-- LOAD
+--------------------
+function game_load ()
+	mode = game
+	lives = 4
+	wave = 0
+	waveText:set( "Wave " .. wave )
+	lifeText:set( "Lives " .. lives )
+	bigText:set( "" )
+
+	player = Bat:new()
+	birdRegistry = {}
+end
+
+--------------------
+-- UPDATE
+--------------------
+function game_update ( dt )
+	bird_n = table.maxn( birdRegistry )
+
+	if ( bird_n == 0 ) then
+		nextWave()
+	end
+
+	for i = 1,bird_n do
+		birdRegistry[i]:update( dt )
+	end
+
+	player:update( dt )
+	animx.update(dt)
+end
+
+--------------------
+-- DRAW
+--------------------
+function game_draw ()
+	for i = 1,table.maxn(birdRegistry) do
+		birdRegistry[i]:draw()
+	end
+	player:draw()
+end
+
+--------------------
+-- INPUT
+--------------------
+function game_keypressed ( key )
 	if ( key == "right" ) then
 		player.moving = true
 		player.direction = right
@@ -60,10 +226,12 @@ function love.keypressed ( key )
 		player.direction = left
 	elseif ( key == "space" ) then
 		player.flying = 2
+	elseif ( key == "escape" ) then
+		gameover_load()
 	end
 end
 
-function love.keyreleased (key)
+function game_keyreleased (key)
 	if ( key == "right"  and  player.direction == right ) then
 		if ( love.keyboard.isDown("left") ) then
 			player.direction = left
@@ -78,6 +246,14 @@ function love.keyreleased (key)
 		end
 	end
 end
+
+----------------------------------------
+-- DRAW
+----------------------------------------
+
+
+
+
 
 
 ----------------------------------------
@@ -145,12 +321,18 @@ function Flier:physics_x ( dt )
 		end
 	end
 
+	if ( self.x < -10 ) then
+		self.x = 800
+	elseif ( self.x > 810 ) then
+		self.x = 0
+	end
+
 	self.x = self.x + self.x_vel * dt
 end
 
 -- physics on the y-axis
 function Flier:physics_y ( dt )
-	gravity = 2
+	gravity = 1
 	floor = 500
 
 	-- wing-flap
@@ -167,11 +349,13 @@ function Flier:physics_y ( dt )
 	-- if on ground; stop gravity
 	if ( self.y > floor ) then
 		self.y = floor
-		self.y_vel = 0
+		self.flying = 2
 	end
 
 	self.y = self.y + self.y_vel * dt
 end
+
+
 
 
 ----------------------------------------
@@ -205,6 +389,42 @@ function Bat:initialize ()
 	Flier.initialize( self, 50, 100, batActor )
 end
 
+-- return whether or not the Bat's colliding with given object
+function Bat:checkCollision ( other )
+	if ( colliding( self, other ) )  then
+--		print("COLLISION AT " .. self.x .. " " .. other.x )
+		return true
+	else
+		return false
+	end
+end
+
+-- check collisions with every bird
+function Bat:checkBirdCollisions ()
+	for i = 1,table.maxn( birdRegistry ) do
+		if ( self:checkCollision(birdRegistry[i]) ) then
+			judgeCollision( self, birdRegistry[i] )
+			return birdRegistry[i]
+		end
+	end
+	return nil
+end
+
+function Bat:update ( dt )
+	self:physics( dt )
+	self:checkBirdCollisions()
+end
+
+function Bat:kill ()
+	lives = lives - 1
+	lifeText:set("Life " .. lives)
+	self.y = -10
+	self.x = 300
+
+	if ( lives <= 0 ) then
+		gameover_load()
+	end
+end
 
 ----------------------------------------
 -- BIRD  	enemy characters
@@ -213,20 +433,36 @@ Bird = class('Bird', Flier)
 
 function Bird:initialize ( x, y )
 	-- animations
-	birdSheet = love.graphics.newImage("art/sprites/bat.png")
 
+	species = math.random(1,2)
+
+	if ( species == 1 ) then
+		flapFrames = { 2, 3, 4, 5 }
+	else
+		flapFrames = { 7, 8, 9, 10 }
+	end
+
+	if ( species == 1 ) then
+		idleFrames = { 1 }
+	else
+		idleFrames = { 6 }
+	end
+
+	birdSheet = love.graphics.newImage("art/sprites/bird.png")
 	birdFlapAnim = animx.newAnimation{
 		img = birdSheet,
 		tileWidth = 32,
-		frames = { 2, 3, 4, 5 }
+		tileHeight = 32,
+		frames = flapFrames
 	}:onAnimOver( function()
-		player.actor:switch('idle')
+		self.actor:switch('idle')
 	end )
 
 	birdIdleAnim = animx.newAnimation {
 		img = birdSheet,
 		tileWidth = 32,
-		frames = { 1 }
+		tileHeight = 32,
+		frames = idleFrames
 	}
 
 	birdActor = animx.newActor {
@@ -235,6 +471,7 @@ function Bird:initialize ( x, y )
 	}:switch('idle')
 
 	Flier.initialize( self, x, y, birdActor )
+
 	self.direction=right
 end
 
@@ -243,25 +480,118 @@ function Bird:update ( dt )
 	self:physics( dt )
 end
 
+function Bird:kill ()
+	index = indexOf(birdRegistry, self)
+	table.remove( birdRegistry, index )
+end
+	
+
 -- basic "ai" (determines where the bird should go)
 function Bird:destiny ()
 	self:destiny_x()
 	self:destiny_y()
 end
 
--- "ai" on x-axis
+-- "ai" on x-axis of species 1
 function Bird:destiny_x ()
-	if ( self.x > 500 ) then
-		self.direction = left
-	elseif (self.x < 200) then
-		self.direction = right
+	if ( species == 1 ) then
+		if ( self.x > 400 ) then
+			self.direction = left
+		elseif ( self.x < 200 ) then
+			self.direction = right
+		end
+	else
+		if ( self.x > player.x + 25  and  math.random(0,50) == 25 ) then
+			self.direction = left
+		elseif ( self.x < player.x - 25  and  math.random(0,50) == 25 ) then
+			self.direction = right
+		end
 	end
 	self.moving = true
 end
 
--- "ai" on y-axis
+-- "ai" on y-axis of species 1
 function Bird:destiny_y ()
-	if ( self.y > player.y  and  math.random(0,50) == 25 ) then
+	if ( self.y > player.y + 50  and  math.random(0,100) == 25 ) then
 		self.flying = 2
 	end
+end
+
+
+----------------------------------------
+-- GAME LOGIC
+----------------------------------------
+function nextWave ( )
+	wave = wave + 1
+	waveText:set("Wave " .. wave)
+	if ( wave > maxScore) then
+		maxScore = wave
+	end
+
+	bird_n = wave * 3
+	
+	for i = 1,bird_n do
+		if ( i % 2 == 0 ) then
+			birdRegistry[i] = Bird:new( math.random(-20, 0), math.random(0, 600) )
+		else
+			birdRegistry[i] = Bird:new( math.random(800, 820), math.random(0, 600) )
+		end
+	end
+end
+
+-- assuming a and b are colliding, act accordingly
+-- aka, bounce-back or kill one
+function judgeCollision ( a, b )
+	if ( a.y < b.y - 5 ) then
+		b:kill()
+	elseif ( a.y > b.y + 5 ) then
+		a:kill()
+	else
+--		new_vel = greatestAbs( a.x_vel, b.x_vel )
+		a.x_vel = a.x_vel * -1
+		b.x_vel = b.x_vel * -1
+	end
+end
+	
+	
+
+
+----------------------------------------
+-- UTIL  	blah blah blah
+----------------------------------------
+-- return whether or not two objects are colliding/overlapping
+function colliding ( a, b )
+	if ( inRange(a.x, b.x - 16, b.x + 16)  and  inRange(a.y, b.y - 16, b.y + 16) ) then
+		return true
+	else
+		return false
+	end
+end
+
+-- return whether or not 'a' is within range 
+function inRange ( a, min, max )
+	if ( min < a  and  a < max ) then
+		return true
+	else
+		return false
+	end
+end
+
+-- return the num with greatest absolute value
+function greatestAbs ( a, b )
+	if ( abs(a) > abs(b) ) then
+		return a
+	else
+		return b
+
+	end
+end
+
+function indexOf ( list, item )
+	for i = 1,table.maxn(list) do
+		if ( list[i] == item ) then
+			return i
+		end
+	end
+	return 0
 end
