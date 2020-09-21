@@ -24,7 +24,7 @@ function love.load ()
 	dieParticle = nil
 	love.graphics.setDefaultFilter("nearest", "nearest", 0)
 	bg = love.graphics.newImage("art/bg/sky.png")
-	a_ttf = love.graphics.newFont("art/font/alagard.ttf")
+	a_ttf = love.graphics.newFont("art/font/alagard.ttf", nil, "none")
 
 	lifeText = love.graphics.newText(a_ttf, "Press Enter")
 	waveText = love.graphics.newText(a_ttf, "")
@@ -297,7 +297,9 @@ end
 
 -- drawing the flier (ofc)
 function Flier:draw ( )
-	if ( self.flying > 0 ) then
+	if ( self.living == false ) then
+		self.actor:switch('die')
+	elseif ( self.flying > 0 ) then
 		self.actor:switch('flap')
 		self.actor:getAnimation():restart()
 		self.flying = self.flying - 1
@@ -387,8 +389,23 @@ end
 function Flier:physics_dead ( dt )
 	-- ignore all input, fall through bottom
 	gravity = 2
+	max_vel = 300 
 	self.y_vel = self.y_vel + gravity
 	self.y = self.y + self.y_vel * dt
+
+	if ( self.x_vel > 0 ) then
+		self.x_vel = self.x_vel - (max_vel / (turn * 3))
+	elseif ( self.x_vel < 0 ) then
+		self.x_vel = self.x_vel + (max_vel / (turn * 3))
+	end
+
+	if ( self.x < -10 ) then
+		self.x = 800
+	elseif ( self.x > 810 ) then
+		self.x = 0
+	end
+
+	self.x = self.x + self.x_vel * dt
 	if ( self.y > 700 ) then
 		self:killFinalize()
 		return false
@@ -398,10 +415,12 @@ function Flier:physics_dead ( dt )
 end
 
 -- kill the Flier, show cool particles
-function Flier:kill ()
+function Flier:kill ( murderer )
 	self.living = false
-	dieParticle:moveTo(self.x, self.y)
-	dieParticle:emit(30)
+	self.x_vel = murderer.x_vel
+
+	dieParticle:moveTo( self.x, self.y )
+	dieParticle:emit( 30 )
 end
 
 -- run after Flier falls through screen
@@ -418,21 +437,24 @@ Bat = class('Bat', Flier)
 function Bat:initialize ()
 	-- animations
 	batSheet = love.graphics.newImage("art/sprites/bat.png")
-	flapFrames = {2,3,4,5}
-	idleFrames = {1}
 
 	batFlapAnim = animx.newAnimation{
-		img = batSheet, tileWidth = 32, frames = flapFrames
+		img = batSheet, tileWidth = 32, frames = {2,3,4,5}
 	}:onAnimOver( function()
 		self.actor:switch('idle')
 	end )
-
 	batIdleAnim = animx.newAnimation {
-		img = batSheet, tileWidth = 32, frames = idleFrames
+		img = batSheet, tileWidth = 32, frames = {1}
+	}
+	batDieAnim = animx.newAnimation {
+		img = batSheet, tileWidth = 32, frames = {6}
+	}
+	batBlockAnim = animx.newAnimation {
+		img = batSheet, tileWidth = 32, frames = {7}
 	}
 
 	batActor = animx.newActor {
-		['idle'] = batIdleAnim, ['flap'] = batFlapAnim
+		['idle'] = batIdleAnim, ['flap'] = batFlapAnim, ['die'] = batDieAnim
 	}:switch('idle')
 
 	Flier.initialize( self, 50, 100, batActor )
@@ -491,8 +513,10 @@ function Bird:initialize ( x, y )
 
 	-- animations
 	birdSheet = love.graphics.newImage("art/sprites/bird.png")
-	flapFrames = { {2,3,4,5}, {7,8,9,10}, {12,13,14,15} }
-	idleFrames = { {1}, {6}, {11} }
+	flapFrames  = { {2,3,4,5}, {9,10,11,12}, {16,17,18,19} }
+	idleFrames  = { {1}, {8}, {15} }
+	dieFrames   = { {6}, {13}, {20} }
+	blockFrames = { {7}, {14}, {21} }
 
 	birdFlapAnim = animx.newAnimation{
 		img = birdSheet, tileWidth = 32, tileHeight = 32, frames = flapFrames[self.species]
@@ -504,8 +528,17 @@ function Bird:initialize ( x, y )
 		img = birdSheet, tileWidth = 32, tileHeight = 32, frames = idleFrames[self.species]
 	}
 
+	birdDieAnim = animx.newAnimation {
+		img = birdSheet, tileWidth = 32, tileHeight = 32, frames = dieFrames[self.species]
+	}
+
+	birdBlockAnim = animx.newAnimation {
+		img = birdSheet, tileWidth = 32, tileHeight = 32, frames = blockFrames[self.species]
+	}
+
 	birdActor = animx.newActor {
-		['idle'] = birdIdleAnim, ['flap'] = birdFlapAnim
+		['idle'] = birdIdleAnim, ['flap'] = birdFlapAnim, ['die'] = birdDieAnim,
+		['block'] = birdBlockAnim
 	}:switch('idle')
 
 	self.actor = birdActor
@@ -594,11 +627,11 @@ end
 -- assuming a and b are colliding, act accordingly
 -- aka, bounce-back or kill one
 function judgeCollision ( a, b )
-	if ( a.y < b.y - 5  and  a.living ) then
-		b:kill()
-	elseif ( a.y > b.y + 5  and  b.living ) then
-		a:kill()
-	else
+	if ( a.y < b.y - 9  and  ( a.living  or  a.class() == "Bat" ) ) then
+		b:kill( a )
+	elseif ( a.y > b.y + 9  and  ( b.living  or  a.class() == "Bat" ) ) then
+		a:kill( b )
+	elseif (  a.living  and  b.living  ) then
 		a.x_vel = a.x_vel * -1
 		b.x_vel = b.x_vel * -1
 	end
@@ -611,7 +644,14 @@ end
 --------------------------------------------------------------------------------
 -- return whether or not two objects are colliding/overlapping
 function colliding ( a, b )
-	if ( inRange(a.x, b.x - 16, b.x + 16)  and  inRange(a.y, b.y - 16, b.y + 16) ) then
+--	min_b_y = -16; max_b_y = 16
+--	min_b_x = -16; max_b_x = 16
+--	if ( b.direction == right ) then
+--		min_b_x = min_b_x + 16
+--		max_b_x = max_b_x + 16
+--	end
+
+	if ( inRange(a.x, b.x - 16, b.x + 16) and  inRange(a.y, b.y + -16, b.y + 16) ) then
 		return true
 	else
 		return false
