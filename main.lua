@@ -64,6 +64,7 @@ function love.draw ()
 	end
 	love.graphics.draw(bg, 0, 0)
 	love.graphics.draw(bg, 512, 0)
+	love.graphics.draw(bg, 1024, 0)
 
 	love.graphics.draw(waveText, 200, 340, 0, 2, 2)
 	love.graphics.draw(lifeText, 125, 355, 0, 1.3, 1.3)
@@ -393,6 +394,8 @@ function game_keypressed ( key )
 		player.flying = 2
 	elseif ( key == "a"  or  key == "z" ) then
 		player:dash()
+	elseif ( key == "s"  or  key == "x" ) then
+		player.blocking = true
 	elseif ( key == "escape" ) then
 		pause_load()
 	end
@@ -417,6 +420,8 @@ function game_keyreleased (key)
 		player.pointing = unsetUp( player.pointing )
 	elseif ( key == "down" ) then
 		player.pointing = unsetDown( player.pointing )
+	elseif ( key == "s"  or  key == "x" ) then
+		player.blocking = false
 	end
 end
 
@@ -437,6 +442,7 @@ function Flier:initialize ( x, y, actor )
 	self.x_vel = 0
 	self.pointing = right
 	self.moving = false
+	self.blocking = false
 	self.flying = 0
 	self.dashTime = 0
 	self.actor = actor
@@ -455,11 +461,16 @@ end
 function Flier:draw ( )
 	if ( self.living == false ) then
 		self.actor:switch('die')
+	elseif ( self.blocking == true ) then
+		self.actor:switch('block')
+	elseif ( self.blocking == false  and  self.actor:getName() == "block" ) then
+		self.actor:switch('idle')
 	elseif ( self.flying > 0 ) then
 		self.actor:switch('flap')
 		self.actor:getAnimation():restart()
 		self.flying = self.flying - 1
 	end
+
 	if ( self.direction == right ) then
 		self.actor:flipX(true)
 	elseif (self.direction == left) then
@@ -528,7 +539,7 @@ end
 -- physics on the y-axis
 function Flier:physics_y ( dt )
 	-- wing-flap
-	if ( self.flying > 0 ) then
+	if ( self.flying > 0  and  self.blocking == false ) then
 		self.y_vel = -200
 		self.flying = self.flying - 1
 		if ( self.species ) then
@@ -595,7 +606,7 @@ function Flier:physics_dead ( dt )
 end
 
 function Flier:dash ()
-	if ( self.dashTime > 0 ) then
+	if ( self.dashTime > 0  or  self.blocking == true ) then
 		return
 	end
 	self.dashTime = 1
@@ -662,7 +673,8 @@ function Bat:initialize ()
 	}
 
 	batActor = animx.newActor {
-		['idle'] = batIdleAnim, ['flap'] = batFlapAnim, ['die'] = batDieAnim
+		['idle'] = batIdleAnim, ['flap'] = batFlapAnim, ['die'] = batDieAnim,
+		['block'] = batBlockAnim
 	}:switch('idle')
 
 	Flier.initialize( self, 50, 100, batActor )
@@ -798,7 +810,7 @@ function Bird:destiny_x ()
 	end
 
 	if ( self.species > 1 ) then
-		if ( inRange( self.x, player.x - 30, player.x + 30 )
+		if ( inRange( self.x, player.x - 40, player.x + 40 )
 		     and  math.random(0,300) == 25 ) then
 			if ( self.y < player.y ) then
 			     	self.pointing = down
@@ -818,7 +830,7 @@ function Bird:destiny_y ()
 	end
 
 	if ( self.species > 1 ) then
-		if ( inRange( self.y, player.y - 30, player.y + 30 )
+		if ( inRange( self.y, player.y - 40, player.y + 40 )
 		     and  math.random(0,300) == 25 ) then
 			if ( self.x < player.x ) then
 			     	self.pointing = right
@@ -917,7 +929,7 @@ function nextWave ( )
 
 	love.audio.play(waveSfx)
 
-	bird_n = wave * 3
+	bird_n = wave * 2
 	
 	for i = 1,bird_n do
 		if ( i % 2 == 0 ) then
@@ -932,13 +944,23 @@ end
 -- aka, bounce-back or kill one
 function judgeCollision ( a, b )
 	if ( a.y < b.y - 9  and  ( b.living )  and  ( a.living  or  a.class() == "Bat" ) ) then
-		b:kill( a )
+		if ( (maxSpeed( a.x_vel )  or  a.dashTime > 0)  and  b.blocking == true ) then
+			a.x_vel = a.x_vel * -1
+			b.x_vel = b.x_vel * -1
+		else
+			b:kill( a )
+		end
 	elseif ( a.y > b.y + 9  and  ( a.living )  and  ( b.living  or  a.class() == "Bat" ) ) then
-		a:kill( b )
+		if ( (maxSpeed( b.x_vel )  or  b.dashTime > 0)  and  a.blocking == true ) then
+			a.x_vel = a.x_vel * -1
+			b.x_vel = b.x_vel * -1
+		else
+			a:kill( b )
+		end
 	elseif (  a.living  and  b.living  ) then
-		if ( a.x_vel > 300  or  a.x_vel < -300 ) then
+		if ( maxSpeed(b.x_vel)  and  a.blocking == false ) then
 			a.kill( b )
-		elseif ( b.x_vel > 300  or  b.x_vel < -300 ) then
+		elseif ( maxSpeed(a.x_vel)  and  b.blocking == false ) then
 			b.kill( a )
 		else
 			a.x_vel = a.x_vel * -1
@@ -946,6 +968,14 @@ function judgeCollision ( a, b )
 		end
 		bounceSfx:stop()
 		bounceSfx:play()
+	end
+end
+
+function maxSpeed ( speed )
+	if ( inRange( speed, -301, 301 ) ) then
+		return false
+	else
+		return true
 	end
 end
 
