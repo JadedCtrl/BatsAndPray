@@ -1,0 +1,3 @@
+Author: 	shiru8bit
+Source: 	https://opengameart.org/content/nes-8-bit-sound-effects
+License:	CC-BY 3.0, CC0

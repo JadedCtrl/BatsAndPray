@@ -22,8 +22,13 @@ function love.load ()
 
 	dieParticle = nil
 	love.graphics.setDefaultFilter("nearest", "nearest", 0)
-	bg = love.graphics.newImage("art/bg/sky.png")
 	a_ttf = love.graphics.newFont("art/font/alagard.ttf", nil, "none")
+	bg = love.graphics.newImage("art/bg/sky.png")
+	bgm = nil
+	flapSfx = love.audio.newSource( "art/sfx/flap.wav", "static")
+	cpuFlapSfx = love.audio.newSource( "art/sfx/cpuflap.wav", "static")
+	bounceSfx = love.audio.newSource( "art/sfx/bounce.wav", "static")
+	waveSfx = love.audio.newSource( "art/sfx/wave.wav", "static")
 
 	lifeText = love.graphics.newText(a_ttf, "Press Enter")
 	waveText = love.graphics.newText(a_ttf, "")
@@ -121,6 +126,17 @@ function mainmenu_load ()
 	bigText:set("Bats & Pray")
 	helpScreen = false
 
+	if ( bgm ) then
+		bgm:stop()
+	end
+	if ( bgm ) then
+		bgm:stop()
+	end
+	bgm = love.audio.newSource( "art/music/menu.ogg", "static")
+	bgm:play()
+	bgm:setLooping( true )
+	bgm:setVolume( 1.5 )
+
 	p_over = nil; p_under = nil; p_bounce = nil; p_dash = nil; p_block = nil; p_bg = nil
 	helpOver = nil; helpBounce = nil; helpDash = nil; helpBlock = nil
 	helpScreen_setup()
@@ -150,6 +166,25 @@ function mainmenu_draw ()
 		frontMenu:draw()
 	end
 end
+
+--------------------
+-- INPUT
+--------------------
+function mainmenu_keypressed ( key )
+	if ( helpScreen == true) then
+		helpScreen = false
+	else
+		frontMenu:keypressed( key )
+	end
+end
+
+function mainmenu_keyreleased ( key )
+	frontMenu:keyreleased( key )
+end
+
+--------------------
+-- HELP SCREEN
+--------------------
 
 function helpScreen_setup ()
 	p_over = love.graphics.newImage("art/sprites/p-over.png")
@@ -187,21 +222,6 @@ function helpScreen_draw ()
 	love.graphics.draw(helpControls, 205, 550, 0, 1.2)
 end
 
---------------------
--- INPUT
---------------------
-function mainmenu_keypressed ( key )
-	if ( helpScreen == true) then
-		helpScreen = false
-	else
-		frontMenu:keypressed( key )
-	end
-end
-
-function mainmenu_keyreleased ( key )
-	frontMenu:keyreleased( key )
-end
-
 
 ----------------------------------------
 -- PAUSE
@@ -213,6 +233,10 @@ function pause_load ()
 	waveText:set("[Enter]")
 	lifeText:set("")
 	bigText:set("Paused")
+
+	love.audio.pause()
+	sfx = love.audio.newSource( "art/sfx/pause.wav", "static")
+	sfx:play()
 end
 
 --------------------
@@ -232,6 +256,8 @@ end
 --------------------
 function pause_keypressed ( key )
 	if ( key == "return"  or  key == "a" ) then
+		sfx:stop()
+		sfx:play()
 		unpauseGame()
 	elseif ( key == "escape" ) then
 		mainmenu_load()
@@ -252,6 +278,10 @@ function gameover_load ()
 	dieParticle = nil
 	lifeText:set("Best " .. maxScore)
 	bigText:set("Game Over")
+	bgm:stop()
+	bgm = love.audio.newSource( "art/music/gameover.ogg", "static")
+	bgm:play()
+
 end
 
 --------------------
@@ -303,6 +333,9 @@ function game_load ()
 	dieParticle:setSizeVariation(1); dieParticle:setEmissionRate(0)
 	dieParticle:setLinearAcceleration(-200, -200, 200, 200) -- Random movement in all directions.
 	dieParticle:setSpeed(40, 50); dieParticle:setColors(1, 1, 1, 1, 1, 1, 1, 0) 
+
+--	bgm = love.audio.newSource( "art/music/game.ogg", "static")
+--	bgm:play()
 end
 
 --------------------
@@ -473,6 +506,12 @@ function Flier:physics_y ( dt )
 	if ( self.flying > 0 ) then
 		self.y_vel = -200
 		self.flying = self.flying - 1
+		if ( self.species ) then
+			love.audio.play(cpuFlapSfx)
+		else
+			flapSfx:stop()
+			flapSfx:play()
+		end
 	end
 
 	-- gravity 
@@ -531,6 +570,13 @@ function Flier:kill ( murderer )
 
 	dieParticle:moveTo( self.x, self.y )
 	dieParticle:emit( 30 )
+
+	if ( self.species ) then
+		sfx = love.audio.newSource( "art/sfx/fall.wav", "static")
+	else
+		sfx = love.audio.newSource( "art/sfx/lose.wav", "static")
+	end
+	sfx:play()
 end
 
 -- run after Flier falls through screen
@@ -723,6 +769,8 @@ function nextWave ( )
 		maxScore = wave
 	end
 
+	love.audio.play(waveSfx)
+
 	bird_n = wave * 3
 	
 	for i = 1,bird_n do
@@ -737,13 +785,15 @@ end
 -- assuming a and b are colliding, act accordingly
 -- aka, bounce-back or kill one
 function judgeCollision ( a, b )
-	if ( a.y < b.y - 9  and  ( a.living  or  a.class() == "Bat" ) ) then
+	if ( a.y < b.y - 9  and  ( b.living )  and  ( a.living  or  a.class() == "Bat" ) ) then
 		b:kill( a )
-	elseif ( a.y > b.y + 9  and  ( b.living  or  a.class() == "Bat" ) ) then
+	elseif ( a.y > b.y + 9  and  ( a.living )  and  ( b.living  or  a.class() == "Bat" ) ) then
 		a:kill( b )
 	elseif (  a.living  and  b.living  ) then
 		a.x_vel = a.x_vel * -1
 		b.x_vel = b.x_vel * -1
+		bounceSfx:stop()
+		bounceSfx:play()
 	end
 end
 
@@ -753,6 +803,7 @@ end
 
 function unpauseGame ()
 	mode = game
+	love.audio.play(bgm)
 	waveText:set( "Wave " .. wave )
 	lifeText:set( "Lives " .. lives )
 	bigText:set( "" )

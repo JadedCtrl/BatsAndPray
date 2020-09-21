@@ -1,0 +1,3 @@
+Author: 	t4ngr4m/avgvsta
+Source: 	https://opengameart.org/content/generic-8-bit-jrpg-soundtrack
+License:	CC-BY 3.0
