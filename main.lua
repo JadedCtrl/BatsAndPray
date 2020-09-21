@@ -796,7 +796,18 @@ function Bird:destiny_x ()
 			self.direction = right
 		end
 	end
-		
+
+	if ( self.species > 1 ) then
+		if ( inRange( self.x, player.x - 30, player.x + 30 )
+		     and  math.random(0,300) == 25 ) then
+			if ( self.y < player.y ) then
+			     	self.pointing = down
+			else
+				self.pointing = up
+			end
+			self:dash()
+		end
+	end
 	self.moving = true
 end
 
@@ -804,6 +815,18 @@ end
 function Bird:destiny_y ()
 	if ( self.y > player.y + 50  and  math.random(0,100) == 25 ) then
 		self.flying = 2
+	end
+
+	if ( self.species > 1 ) then
+		if ( inRange( self.y, player.y - 30, player.y + 30 )
+		     and  math.random(0,300) == 25 ) then
+			if ( self.x < player.x ) then
+			     	self.pointing = right
+			else
+				self.pointing = left
+			end
+			self:dash()
+		end
 	end
 end
 
@@ -989,90 +1012,52 @@ end
 --------------------
 -- idk if Lua has macros, if it does, that'd be *WAY* better than this shit
 
-function isRight ( direction )
-	return ( direction == 2  or  direction == 12  or  direction == 22 )
-end
-
-function isLeft ( direction )
-	return ( direction == 1  or  direction == 11  or  direction == 21 )
-end
-
-function isUp ( direction )
-	return ( 10 <= direction  and  direction < 20 )
-end
-
-function isDown ( direction )
-	return ( 20 <= direction  and  direction < 30 )
-end
+function isRight ( direction ) return ( direction == 2  or  direction == 12  or  direction == 22 ) end
+function isLeft ( direction ) return ( direction == 1  or  direction == 11  or  direction == 21 ) end
+function isUp ( direction ) return ( 10 <= direction  and  direction < 20 ) end
+function isDown ( direction ) return ( 20 <= direction  and  direction < 30 ) end
 
 function setLeft ( direction )
-	if ( isLeft(direction) ) then
-		return direction
-	elseif ( isRight(direction) ) then
-		return direction - 1
-	else
-		return direction + 1
+	if ( isLeft(direction) ) then return direction
+	elseif ( isRight(direction) ) then return direction - 1
+	else return direction + 1
 	end
 end
-
 function unsetLeft ( direction )
-	if ( isLeft(direction ) ) then
-		return direction - left
-	else
-		return direction
+	if ( isLeft(direction ) ) then return direction - left
+	else return direction
 	end
 end
-		
 function setRight ( direction )
-	if ( isRight(direction) ) then
-		return direction
-	elseif ( isLeft(direction) ) then
-		return direction + 1
-	else
-		return direction + 2
+	if ( isRight(direction) ) then return direction
+	elseif ( isLeft(direction) ) then return direction + 1
+	else return direction + 2
 	end
 end
-
 function unsetRight ( direction )
-	if ( isRight(direction ) ) then
-		return direction - right
-	else
-		return direction
+	if ( isRight(direction ) ) then return direction - right
+	else return direction
 	end
 end
-
 function setUp ( direction )
-	if ( isUp(direction) == true ) then
-		return direction
-	elseif ( isDown(direction) == true ) then
-		return direction - 10
-	else
-		return direction + up
+	if ( isUp(direction) == true ) then return direction
+	elseif ( isDown(direction) == true ) then return direction - 10
+	else return direction + up
 	end
 end
-
 function unsetUp ( direction )
-	if ( isUp(direction ) ) then
-		return direction - up
-	else
-		return direction
+	if ( isUp(direction ) ) then return direction - up
+	else return direction
 	end
 end
-
 function setDown ( direction )
-	if ( isDown(direction) ) then
-		return direction
-	elseif ( isUp(direction) ) then
-		return direction + 10
-	else
-		return direction + down
+	if ( isDown(direction) ) then return direction
+	elseif ( isUp(direction) ) then return direction + 10
+	else return direction + down
 	end
 end
-
 function unsetDown ( direction )
-	if ( isDown( direction ) ) then
-		return direction - down
-	else
-		return direction
+	if ( isDown( direction ) ) then return direction - down
+	else return direction
 	end
 end
