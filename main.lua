@@ -4,8 +4,8 @@ class  = require "lib/middleclass"
 ----------------------------------------
 -- CONSTANTS
 ----------------------------------------
-left = 0;  right = 1;  up = 2;  down = 3
-upleft = 4; downleft = 5; upright = 6; downright = 7
+left = 1;  right = 2;  up = 10;  down = 20
+upleft = 11; downleft = 21; upright = 12; downright = 22
 mainmenu = 0; game = 1; gameover = 2; pause = 3
 
 --------------------------------------------------------------------------------
@@ -380,11 +380,19 @@ function game_keypressed ( key )
 	if ( key == "right" ) then
 		player.moving = true
 		player.direction = right
+		player.pointing = setRight( player.pointing )
 	elseif ( key == "left" ) then
 		player.moving = true
 		player.direction = left
+		player.pointing = setLeft( player.pointing )
+	elseif ( key == "up" ) then
+		player.pointing = setUp( player.pointing )
+	elseif ( key == "down" ) then
+		player.pointing = setDown( player.pointing )
 	elseif ( key == "space" ) then
 		player.flying = 2
+	elseif ( key == "a"  or  key == "z" ) then
+		player:dash()
 	elseif ( key == "escape" ) then
 		pause_load()
 	end
@@ -397,12 +405,18 @@ function game_keyreleased (key)
 		else
 			player.moving = false
 		end
+		player.pointing = unsetRight( player.pointing )
 	elseif ( key == "left"  and  player.direction == left ) then
 		if ( love.keyboard.isDown("right") ) then
 			player.direction = right
 		else
 			player.moving = false
 		end
+		player.pointing = unsetLeft( player.pointing )
+	elseif ( key == "up" ) then
+		player.pointing = unsetUp( player.pointing )
+	elseif ( key == "down" ) then
+		player.pointing = unsetDown( player.pointing )
 	end
 end
 
@@ -421,8 +435,10 @@ function Flier:initialize ( x, y, actor )
 	self.y = y
 	self.y_vel = 0
 	self.x_vel = 0
+	self.pointing = right
 	self.moving = false
 	self.flying = 0
+	self.dashTime = 0
 	self.actor = actor
 	self.living = true
 end
@@ -430,6 +446,9 @@ end
 -- generic flier update: physics
 function Flier:update ( dt )
 	self:physics( dt )
+	if ( self.dashTime > 0 ) then
+		self.dashTime = self.dashTime - dt
+	end
 end
 
 -- drawing the flier (ofc)
@@ -491,6 +510,12 @@ function Flier:physics_x ( dt )
 		end
 	end
 
+	if ( self.x_vel >= max_vel ) then
+		self.x_vel = self.x_vel - (max_vel / (turn * 3))
+	elseif ( self.x_vel <= min_vel ) then
+		self.x_vel = self.x_vel + (max_vel / (turn * 3))
+	end
+
 	if ( self.x < -5 ) then
 		self.x = 800
 	elseif ( self.x > 805 ) then
@@ -513,7 +538,6 @@ function Flier:physics_y ( dt )
 			flapSfx:play()
 		end
 	end
-
 	-- gravity 
 	if ( self.y < floor ) then
 		self.y_vel = self.y_vel + gravity
@@ -523,6 +547,13 @@ function Flier:physics_y ( dt )
 	if ( self.y < ceiling ) then
 		self.y_vel = self.y_vel * -1
 		self.y = ceiling + 1
+	end
+
+	-- too speedy
+	if ( self.y_vel >= max_vel ) then
+		self.y_vel = self.y_vel - (max_vel / (turn * 3))
+	elseif ( self.x_vel <= min_vel ) then
+		self.y_vel = self.y_vel + (max_vel / (turn * 3))
 	end
 
 	-- if on ground; flap your wings
@@ -563,10 +594,31 @@ function Flier:physics_dead ( dt )
 	end
 end
 
+function Flier:dash ()
+	if ( self.dashTime > 0 ) then
+		return
+	end
+	self.dashTime = 1
+
+	if ( isUp(self.pointing) ) then
+		self.y_vel = max_vel * -1.5
+	elseif ( isDown(self.pointing) ) then
+		self.y_vel = max_vel * 1.5
+	end
+
+	if ( isRight(self.pointing) ) then
+		self.x_vel = max_vel * 2
+	elseif ( isLeft(self.pointing) ) then
+		self.x_vel = max_vel * -2
+	end
+end
+
 -- kill the Flier, show cool particles
 function Flier:kill ( murderer )
 	self.living = false
-	self.x_vel = murderer.x_vel
+	if ( murderer ) then
+		self.x_vel = murderer.x_vel
+	end
 
 	dieParticle:moveTo( self.x, self.y )
 	dieParticle:emit( 30 )
@@ -619,6 +671,9 @@ end
 function Bat:update ( dt )
 	self:physics( dt )
 	self:checkBirdCollisions()
+	if ( self.dashTime > 0 ) then
+		self.dashTime = self.dashTime - dt
+	end
 end
 
 
@@ -711,6 +766,9 @@ end
 
 function Bird:update ( dt )
 	self:destiny()
+	if ( self.dashTime > 0 ) then
+		self.dashTime = self.dashTime - dt
+	end
 	return self:physics( dt )
 end
 
@@ -754,59 +812,6 @@ end
 function Bird:killFinalize()
 	index = indexOf(birdRegistry, self)
 	table.remove( birdRegistry, index )
-end
-
-
-
---------------------------------------------------------------------------------
--- MISC GAME LOGIC
---------------------------------------------------------------------------------
--- set up a new wave of birds
-function nextWave ( )
-	wave = wave + 1
-	waveText:set("Wave " .. wave)
-	if ( wave > maxScore) then
-		maxScore = wave
-	end
-
-	love.audio.play(waveSfx)
-
-	bird_n = wave * 3
-	
-	for i = 1,bird_n do
-		if ( i % 2 == 0 ) then
-			birdRegistry[i] = Bird:new( math.random(-20, 0), math.random(0, 600) )
-		else
-			birdRegistry[i] = Bird:new( math.random(800, 820), math.random(0, 600) )
-		end
-	end
-end
-
--- assuming a and b are colliding, act accordingly
--- aka, bounce-back or kill one
-function judgeCollision ( a, b )
-	if ( a.y < b.y - 9  and  ( b.living )  and  ( a.living  or  a.class() == "Bat" ) ) then
-		b:kill( a )
-	elseif ( a.y > b.y + 9  and  ( a.living )  and  ( b.living  or  a.class() == "Bat" ) ) then
-		a:kill( b )
-	elseif (  a.living  and  b.living  ) then
-		a.x_vel = a.x_vel * -1
-		b.x_vel = b.x_vel * -1
-		bounceSfx:stop()
-		bounceSfx:play()
-	end
-end
-
-function pauseGame ()
-	pause_load()
-end
-
-function unpauseGame ()
-	mode = game
-	love.audio.play(bgm)
-	waveText:set( "Wave " .. wave )
-	lifeText:set( "Lives " .. lives )
-	bigText:set( "" )
 end
 
 
@@ -877,17 +882,72 @@ end
 
 
 --------------------------------------------------------------------------------
+-- MISC GAME LOGIC
+--------------------------------------------------------------------------------
+-- set up a new wave of birds
+function nextWave ( )
+	wave = wave + 1
+	waveText:set("Wave " .. wave)
+	if ( wave > maxScore) then
+		maxScore = wave
+	end
+
+	love.audio.play(waveSfx)
+
+	bird_n = wave * 3
+	
+	for i = 1,bird_n do
+		if ( i % 2 == 0 ) then
+			birdRegistry[i] = Bird:new( math.random(-20, 0), math.random(0, 600) )
+		else
+			birdRegistry[i] = Bird:new( math.random(800, 820), math.random(0, 600) )
+		end
+	end
+end
+
+-- assuming a and b are colliding, act accordingly
+-- aka, bounce-back or kill one
+function judgeCollision ( a, b )
+	if ( a.y < b.y - 9  and  ( b.living )  and  ( a.living  or  a.class() == "Bat" ) ) then
+		b:kill( a )
+	elseif ( a.y > b.y + 9  and  ( a.living )  and  ( b.living  or  a.class() == "Bat" ) ) then
+		a:kill( b )
+	elseif (  a.living  and  b.living  ) then
+		if ( a.x_vel > 300  or  a.x_vel < -300 ) then
+			a.kill( b )
+		elseif ( b.x_vel > 300  or  b.x_vel < -300 ) then
+			b.kill( a )
+		else
+			a.x_vel = a.x_vel * -1
+			b.x_vel = b.x_vel * -1
+		end
+		bounceSfx:stop()
+		bounceSfx:play()
+	end
+end
+
+function pauseGame ()
+	pause_load()
+end
+
+function unpauseGame ()
+	mode = game
+	love.audio.play(bgm)
+	waveText:set( "Wave " .. wave )
+	lifeText:set( "Lives " .. lives )
+	bigText:set( "" )
+end
+
+
+
+
+
+
+--------------------------------------------------------------------------------
 -- UTIL  	blah blah blah
 --------------------------------------------------------------------------------
 -- return whether or not two objects are colliding/overlapping
 function colliding ( a, b )
---	min_b_y = -16; max_b_y = 16
---	min_b_x = -16; max_b_x = 16
---	if ( b.direction == right ) then
---		min_b_x = min_b_x + 16
---		max_b_x = max_b_x + 16
---	end
-
 	if ( inRange(a.x, b.x - 16, b.x + 16) and  inRange(a.y, b.y + -16, b.y + 16) ) then
 		return true
 	else
@@ -922,4 +982,97 @@ function indexOf ( list, item )
 		end
 	end
 	return 0
+end
+
+--------------------
+-- RIDICULOUS DIRECTION FUNCTIONS
+--------------------
+-- idk if Lua has macros, if it does, that'd be *WAY* better than this shit
+
+function isRight ( direction )
+	return ( direction == 2  or  direction == 12  or  direction == 22 )
+end
+
+function isLeft ( direction )
+	return ( direction == 1  or  direction == 11  or  direction == 21 )
+end
+
+function isUp ( direction )
+	return ( 10 <= direction  and  direction < 20 )
+end
+
+function isDown ( direction )
+	return ( 20 <= direction  and  direction < 30 )
+end
+
+function setLeft ( direction )
+	if ( isLeft(direction) ) then
+		return direction
+	elseif ( isRight(direction) ) then
+		return direction - 1
+	else
+		return direction + 1
+	end
+end
+
+function unsetLeft ( direction )
+	if ( isLeft(direction ) ) then
+		return direction - left
+	else
+		return direction
+	end
+end
+		
+function setRight ( direction )
+	if ( isRight(direction) ) then
+		return direction
+	elseif ( isLeft(direction) ) then
+		return direction + 1
+	else
+		return direction + 2
+	end
+end
+
+function unsetRight ( direction )
+	if ( isRight(direction ) ) then
+		return direction - right
+	else
+		return direction
+	end
+end
+
+function setUp ( direction )
+	if ( isUp(direction) == true ) then
+		return direction
+	elseif ( isDown(direction) == true ) then
+		return direction - 10
+	else
+		return direction + up
+	end
+end
+
+function unsetUp ( direction )
+	if ( isUp(direction ) ) then
+		return direction - up
+	else
+		return direction
+	end
+end
+
+function setDown ( direction )
+	if ( isDown(direction) ) then
+		return direction
+	elseif ( isUp(direction) ) then
+		return direction + 10
+	else
+		return direction + down
+	end
+end
+
+function unsetDown ( direction )
+	if ( isDown( direction ) ) then
+		return direction - down
+	else
+		return direction
+	end
 end
