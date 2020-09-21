@@ -1,0 +1,2 @@
+License:	CC0
+Uses birds & bats by MoikMellah (see bird.txt, bat.txt).

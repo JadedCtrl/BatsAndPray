@@ -6,7 +6,7 @@ class  = require "lib/middleclass"
 ----------------------------------------
 left = 0;  right = 1;  up = 2;  down = 3
 upleft = 4; downleft = 5; upright = 6; downright = 7
-menu = 0; game = 1; gameover = 2
+mainmenu = 0; game = 1; gameover = 2; pause = 3
 
 --------------------------------------------------------------------------------
 -- GAME STATES
@@ -16,7 +16,6 @@ menu = 0; game = 1; gameover = 2
 -- LOAD
 --------------------
 function love.load ()
-	mode = menu
 	vScale = 0
 	maxScore = 0
 	math.randomseed(os.time())
@@ -29,21 +28,25 @@ function love.load ()
 	lifeText = love.graphics.newText(a_ttf, "Press Enter")
 	waveText = love.graphics.newText(a_ttf, "")
 	bigText  = love.graphics.newText(a_ttf, "Bats & Pray")
+	frontMenu = nil
 
 	-- for compliance with Statute 43.5 (2019); all birds must report births to local Officials
 	birdRegistry = {}
+	mainmenu_load()
 end
 
 --------------------
 -- UPDATE
 --------------------
 function love.update ( dt )
-	if ( mode == menu ) then
-		menu_update( dt )
+	if ( mode == mainmenu ) then
+		mainmenu_update( dt )
 	elseif ( mode == game ) then
 		game_update( dt )
 	elseif ( mode == gameover ) then
 		gameover_update( dt )
+	elseif ( mode == pause ) then
+		pause_update( dt )
 	end
 end
 
@@ -61,12 +64,14 @@ function love.draw ()
 	love.graphics.draw(lifeText, 125, 355, 0, 1.3, 1.3)
 	love.graphics.draw(bigText, 300, 300, 0, 3.5, 3.5)
 
-	if ( mode == menu ) then
-		menu_draw()
+	if ( mode == mainmenu ) then
+		mainmenu_draw()
 	elseif ( mode == game ) then
 		game_draw()
 	elseif ( mode == gameover ) then
 		gameover_draw()
+	elseif ( mode == pause ) then
+		pause_draw()
 	end
 end
 
@@ -78,22 +83,26 @@ end
 -- INPUT
 ----------------------------------------
 function love.keypressed ( key )
-	if ( mode == menu ) then
-		menu_keypressed( key )
+	if ( mode == mainmenu ) then
+		mainmenu_keypressed( key )
 	elseif ( mode == game ) then
 		game_keypressed( key )
 	elseif ( mode == gameover ) then
 		gameover_keypressed( key )
+	elseif ( mode == pause ) then
+		pause_keypressed( key )
 	end
 end
 
 function love.keyreleased (key)
-	if ( mode == menu ) then
-		menu_keyreleased( key )
+	if ( mode == mainmenu ) then
+		mainmenu_keyreleased( key )
 	elseif ( mode == game ) then
 		game_keyreleased( key )
 	elseif ( mode == gameover ) then
 		gameover_keyreleased( key )
+	elseif ( mode == pause ) then
+		pause_keyreleased( key )
 	end
 end
 
@@ -103,36 +112,133 @@ end
 ----------------------------------------
 -- LOAD
 --------------------
-function menu_load ()
-	mode = menu
+function mainmenu_load ()
+	mode = mainmenu
+	selection = 1
 	dieParticle = nil
 	waveText:set("[Enter]")
 	lifeText:set("")
 	bigText:set("Bats & Pray")
+	helpScreen = false
+
+	p_over = nil; p_under = nil; p_bounce = nil; p_dash = nil; p_block = nil; p_bg = nil
+	helpOver = nil; helpBounce = nil; helpDash = nil; helpBlock = nil
+	helpScreen_setup()
+
+	frontMenu = Menu:new( 100, 100, 30, 50, 2, 
+			      { { love.graphics.newText(a_ttf, "Play Game"),
+				  function () game_load() end },
+				{ love.graphics.newText(a_ttf, "Help"),
+				  function () helpScreen = true end },
+				{ love.graphics.newText(a_ttf, "Quit"),
+				  function () love.event.quit( 0 ) end } } )
 end
 
 --------------------
 -- UPDATE
 --------------------
-function menu_update ( dt )
+function mainmenu_update ( dt )
 end
 
 --------------------
 -- DRAW
 --------------------
-function menu_draw ()
+function mainmenu_draw ()
+	if ( helpScreen == true ) then
+		helpScreen_draw()
+	elseif ( frontMenu ) then
+		frontMenu:draw()
+	end
+end
+
+function helpScreen_setup ()
+	p_over = love.graphics.newImage("art/sprites/p-over.png")
+	p_under = love.graphics.newImage("art/sprites/p-under.png")
+	p_bounce = love.graphics.newImage("art/sprites/p-bounce.png")
+	p_dash = love.graphics.newImage("art/sprites/p-dash.png")
+	p_block = love.graphics.newImage("art/sprites/p-block.png")
+	p_block = love.graphics.newImage("art/sprites/p-block.png")
+	h_bg = love.graphics.newImage("art/bg/help.png")
+
+	helpOver = love.graphics.newText(a_ttf, "He on top, wins.")
+	helpBounce = love.graphics.newText(a_ttf, "Meet equals,\npart equals.")
+	helpBlock = love.graphics.newText(a_ttf, "Guard yourself.")
+	helpDash = love.graphics.newText(a_ttf, "Move with\n   grace.")
+
+	helpLuck = love.graphics.newText(a_ttf, "Godspeed!")
+	helpControls = love.graphics.newText(a_ttf, "Arrows - Point   Space - Flap   A/Z - Dash   S/X - Block")
+end
+
+function helpScreen_draw ()
+	love.graphics.draw(h_bg)
+	love.graphics.draw(p_over, 100, 50, 0, 1.5, 1.5)
+	love.graphics.draw(p_under, 535, 50, 0, 1.5, 1.5)
+	love.graphics.draw(helpOver, 285, 110, 0, 2.3)
+
+	love.graphics.draw(p_bounce, 50, 200, 0, 1.5, 1.5)
+	love.graphics.draw(helpBounce, 225, 250, 0, 2)
+
+	love.graphics.draw(p_dash, 585, 200, 0, 1.5, 1.5)
+	love.graphics.draw(helpDash, 440, 250, 0, 2)
+
+	love.graphics.draw(p_block, 320, 350, 0, 1.5, 1.5)
+	love.graphics.draw(helpBlock, 120, 420, 0, 2)
+	love.graphics.draw(helpLuck, 500, 420, 0, 2)
+	love.graphics.draw(helpControls, 205, 550, 0, 1.2)
 end
 
 --------------------
 -- INPUT
 --------------------
-function menu_keypressed ( key )
---	if ( key == "enter" ) then
-		game_load()
---	end
+function mainmenu_keypressed ( key )
+	if ( helpScreen == true) then
+		helpScreen = false
+	else
+		frontMenu:keypressed( key )
+	end
 end
 
-function menu_keyreleased ( key )
+function mainmenu_keyreleased ( key )
+	frontMenu:keyreleased( key )
+end
+
+
+----------------------------------------
+-- PAUSE
+----------------------------------------
+-- LOAD
+--------------------
+function pause_load ()
+	mode = pause
+	waveText:set("[Enter]")
+	lifeText:set("")
+	bigText:set("Paused")
+end
+
+--------------------
+-- UPDATE
+--------------------
+function pause_update ( dt )
+end
+
+--------------------
+-- DRAW
+--------------------
+function pause_draw ()
+end
+
+--------------------
+-- INPUT
+--------------------
+function pause_keypressed ( key )
+	if ( key == "return"  or  key == "a" ) then
+		unpauseGame()
+	elseif ( key == "escape" ) then
+		mainmenu_load()
+	end
+end
+
+function pause_keyreleased ( key )
 end
 
 
@@ -165,9 +271,9 @@ end
 -- INPUT
 --------------------
 function gameover_keypressed ( key )
---	if ( key == "enter" ) then
-		game_load()
---	end
+	if ( key == "return"  or  key == "escape" ) then
+		mainmenu_load()
+	end
 end
 
 function gameover_keyreleased ( key )
@@ -191,14 +297,12 @@ function game_load ()
 	birdRegistry = {}
 
 	-- death particles
-	diePArt = love.graphics.newImage("art/sprites/particle.png")
+	diePArt = love.graphics.newImage("art/sprites/heart.png")
 	dieParticle = love.graphics.newParticleSystem(diePArt, 30)
 	dieParticle:setParticleLifetime(.5) -- Particles live at least 2s and at most 5s.
-	dieParticle:setSizeVariation(1)
-	dieParticle:setEmissionRate(0)
+	dieParticle:setSizeVariation(1); dieParticle:setEmissionRate(0)
 	dieParticle:setLinearAcceleration(-200, -200, 200, 200) -- Random movement in all directions.
-	dieParticle:setSpeed(40, 50)
-	dieParticle:setColors(1, 1, 1, 1, 1, 1, 1, 0) 
+	dieParticle:setSpeed(40, 50); dieParticle:setColors(1, 1, 1, 1, 1, 1, 1, 0) 
 end
 
 --------------------
@@ -249,7 +353,7 @@ function game_keypressed ( key )
 	elseif ( key == "space" ) then
 		player.flying = 2
 	elseif ( key == "escape" ) then
-		gameover_load()
+		pause_load()
 	end
 end
 
@@ -316,6 +420,13 @@ end
 -- "physics"
 --------------------
 function Flier:physics ( dt )
+	gravity = 1
+	floor = 500
+	ceiling = 0
+	max_vel = 300
+	min_vel = -300
+	turn = 150
+
 	if ( self.living ) then
 		self:physics_x( dt )
 		self:physics_y( dt )
@@ -327,13 +438,9 @@ end
 
 -- physics on the x-axis
 function Flier:physics_x ( dt )
-	turn = 150
 	if ( self.species ) then -- if bird
 		max_vel = 280
 		min_vel = -280
-	else	
-		max_vel = 300
-		min_vel = -300
 	end
 
 	-- holding arrow-key
@@ -351,9 +458,9 @@ function Flier:physics_x ( dt )
 		end
 	end
 
-	if ( self.x < -10 ) then
+	if ( self.x < -5 ) then
 		self.x = 800
-	elseif ( self.x > 810 ) then
+	elseif ( self.x > 805 ) then
 		self.x = 0
 	end
 
@@ -362,9 +469,6 @@ end
 
 -- physics on the y-axis
 function Flier:physics_y ( dt )
-	gravity = 1
-	floor = 500
-
 	-- wing-flap
 	if ( self.flying > 0 ) then
 		self.y_vel = -200
@@ -374,6 +478,12 @@ function Flier:physics_y ( dt )
 	-- gravity 
 	if ( self.y < floor ) then
 		self.y_vel = self.y_vel + gravity
+	end
+
+	-- atmosphere (ceiling)
+	if ( self.y < ceiling ) then
+		self.y_vel = self.y_vel * -1
+		self.y = ceiling + 1
 	end
 
 	-- if on ground; flap your wings
@@ -389,9 +499,6 @@ end
 function Flier:physics_dead ( dt )
 	-- ignore all input, fall through bottom
 	gravity = 2
-	max_vel = 300 
-	self.y_vel = self.y_vel + gravity
-	self.y = self.y + self.y_vel * dt
 
 	if ( self.x_vel > 0 ) then
 		self.x_vel = self.x_vel - (max_vel / (turn * 3))
@@ -405,7 +512,10 @@ function Flier:physics_dead ( dt )
 		self.x = 0
 	end
 
+	self.y_vel = self.y_vel + gravity
+	self.y = self.y + self.y_vel * dt
 	self.x = self.x + self.x_vel * dt
+
 	if ( self.y > 700 ) then
 		self:killFinalize()
 		return false
@@ -634,6 +744,82 @@ function judgeCollision ( a, b )
 	elseif (  a.living  and  b.living  ) then
 		a.x_vel = a.x_vel * -1
 		b.x_vel = b.x_vel * -1
+	end
+end
+
+function pauseGame ()
+	pause_load()
+end
+
+function unpauseGame ()
+	mode = game
+	waveText:set( "Wave " .. wave )
+	lifeText:set( "Lives " .. lives )
+	bigText:set( "" )
+end
+
+
+
+--------------------------------------------------------------------------------
+-- MENUS  	blah blah blah
+--------------------------------------------------------------------------------
+Menu = class("Menu")
+
+function Menu:initialize( x, y, offset_x, offset_y, scale, menuItems )
+	self.x = x; self.y = y
+	self.offset_x = offset_x; self.offset_y = offset_y
+	self.scale = scale
+	self.options = menuItems
+	self.selected = 1
+	self.enter = false
+	self.up = false
+	self.down = false
+end
+
+function Menu:draw ( )
+	for i = 1,table.maxn(self.options) do
+		this_y = self.y + ( self.offset_y * i )
+
+		love.graphics.draw( self.options[i][1],
+				    self.x, this_y, 0, self.scale, self.scale )
+		if ( i == self.selected ) then
+			love.graphics.draw( love.graphics.newText(a_ttf, ">>"),
+					    self.x - self.offset_x, this_y, 0,
+					    self.scale, self.scale)
+		end
+	end
+end
+
+function Menu:keypressed ( key )
+	maxn = table.maxn( self.options )
+
+	if ( key == "return"  and  self.enter == false ) then
+		self.enter = true
+		if ( self.options[self.selected][2] ) then
+			self.options[self.selected][2]()
+		end
+	elseif ( key == "up"  and  self.selected > 1  and  self.up == false ) then
+		self.up = true
+		self.selected = self.selected - 1
+	elseif ( key == "up"  and  self.up == false ) then
+		self.up = true
+		self.selected = maxn
+	elseif ( key == "down" and self.selected < maxn  and  self.down == false ) then
+		self.down = true
+		self.selected = self.selected + 1
+	elseif ( key == "down" and  self.down == false ) then
+		self.down = true
+		self.selected = 1
+	end
+end
+
+function Menu:keyreleased ( key )
+	if ( key == "return" ) then
+		self.enter = false
+	elseif ( key == "up" ) then
+		self.up = false
+	elseif ( key == "down" ) then
+		self.down = false
 	end
 end
 
