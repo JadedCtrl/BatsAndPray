@@ -32,6 +32,11 @@ function love.load ()
 	bounceSfx = love.audio.newSource( "art/sfx/bounce.wav", "static")
 	waveSfx = love.audio.newSource( "art/sfx/wave.wav", "static")
 
+	dashSfx:setVolume( .8 )
+	cpuDashSfx:setVolume( .8 )
+	bounceSfx:setVolume( .8 )
+	waveSfx:setVolume( .8 )
+
 	lifeText = love.graphics.newText(a_ttf, "Press Enter")
 	waveText = love.graphics.newText(a_ttf, "")
 	bigText  = love.graphics.newText(a_ttf, "Bats & Pray")
@@ -65,7 +70,6 @@ function love.draw ()
 		love.graphics.scale( vScale, vScale )
 	end
 	love.graphics.draw(bg, 0, 0)
-	love.graphics.draw(bg, 512, 0)
 
 	love.graphics.draw(waveText, 200, 340, 0, 2, 2)
 	love.graphics.draw(lifeText, 125, 355, 0, 1.3, 1.3)
@@ -649,6 +653,7 @@ function Flier:kill ( murderer )
 	else
 		sfx = love.audio.newSource( "art/sfx/lose.wav", "static")
 	end
+		sfx:setVolume( .8 )
 	sfx:play()
 end
 
