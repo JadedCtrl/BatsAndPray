@@ -27,6 +27,8 @@ function love.load ()
 	bgm = nil
 	flapSfx = love.audio.newSource( "art/sfx/flap.wav", "static")
 	cpuFlapSfx = love.audio.newSource( "art/sfx/cpuflap.wav", "static")
+	dashSfx = love.audio.newSource( "art/sfx/dash.wav", "static")
+	cpuDashSfx = love.audio.newSource( "art/sfx/cpudash.wav", "static")
 	bounceSfx = love.audio.newSource( "art/sfx/bounce.wav", "static")
 	waveSfx = love.audio.newSource( "art/sfx/wave.wav", "static")
 
@@ -64,7 +66,6 @@ function love.draw ()
 	end
 	love.graphics.draw(bg, 0, 0)
 	love.graphics.draw(bg, 512, 0)
-	love.graphics.draw(bg, 1024, 0)
 
 	love.graphics.draw(waveText, 200, 340, 0, 2, 2)
 	love.graphics.draw(lifeText, 125, 355, 0, 1.3, 1.3)
@@ -318,7 +319,7 @@ end
 --------------------
 function game_load ()
 	mode = game
-	lives = 4
+	lives = 6
 	wave = 0
 	waveText:set( "Wave " .. wave )
 	lifeText:set( "Lives " .. lives )
@@ -621,6 +622,14 @@ function Flier:dash ()
 		self.x_vel = max_vel * 2
 	elseif ( isLeft(self.pointing) ) then
 		self.x_vel = max_vel * -2
+	end
+
+	if ( self.species ) then
+		cpuDashSfx:stop()
+		cpuDashSfx:play()
+	else
+		dashSfx:stop()
+		dashSfx:play()
 	end
 end
 
@@ -943,14 +952,14 @@ end
 -- assuming a and b are colliding, act accordingly
 -- aka, bounce-back or kill one
 function judgeCollision ( a, b )
-	if ( a.y < b.y - 9  and  ( b.living )  and  ( a.living  or  a.class() == "Bat" ) ) then
+	if ( a.y < b.y - 12  and  ( b.living )  and  ( a.living  or  a.class() == "Bat" ) ) then
 		if ( (maxSpeed( a.x_vel )  or  a.dashTime > 0)  and  b.blocking == true ) then
 			a.x_vel = a.x_vel * -1
 			b.x_vel = b.x_vel * -1
 		else
 			b:kill( a )
 		end
-	elseif ( a.y > b.y + 9  and  ( a.living )  and  ( b.living  or  a.class() == "Bat" ) ) then
+	elseif ( a.y > b.y + 12  and  ( a.living )  and  ( b.living  or  a.class() == "Bat" ) ) then
 		if ( (maxSpeed( b.x_vel )  or  b.dashTime > 0)  and  a.blocking == true ) then
 			a.x_vel = a.x_vel * -1
 			b.x_vel = b.x_vel * -1
