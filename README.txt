@@ -1,12 +1,17 @@
-Game made for Open Jam 2020.
+BATS AND PRAY
+================================================================================
+Joust-like game made for Open Jam 2020.
 
 Tools used:
 	LOVE2D (engine; ZLIB license)
 
-Not much yet.
+Tools used (but who cares):
+	Haiku (operating system)
+	Becasso (image editor)
+	Vim B)
 
 
 LICENSING
-----------------------------------------
+--------------------------------------------------
 Code under GPLv3 (see COPYING.txt)
-Art under varying (see COPYING-ART.txt)
+Art under varying (libre; see COPYING-ART.txt)
