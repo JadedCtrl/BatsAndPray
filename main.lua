@@ -336,8 +336,9 @@ function game_load ()
 	dieParticle:setLinearAcceleration(-200, -200, 200, 200) -- Random movement in all directions.
 	dieParticle:setSpeed(40, 50); dieParticle:setColors(1, 1, 1, 1, 1, 1, 1, 0) 
 
---	bgm = love.audio.newSource( "art/music/game.ogg", "static")
---	bgm:play()
+	bgm:stop()
+	bgm = love.audio.newSource( "art/music/game.ogg", "static")
+	bgm:play()
 end
 
 --------------------
