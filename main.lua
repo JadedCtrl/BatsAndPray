@@ -612,7 +612,7 @@ function Flier:physics_dead ( dt )
 end
 
 function Flier:dash ()
-	if ( self.dashTime > 0  or  self.blocking == true ) then
+	if ( self.dashTime > 0  or  self.blocking == true  or  self.living == false ) then
 		return
 	end
 	self.dashTime = 1
